@@ -31,6 +31,8 @@ func (r *Router) Setup() *gin.Engine {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(r.db, r.authService)
 	eventHandler := handlers.NewEventHandler(r.db)
+	deptHandler := &handlers.DepartmentHandler{DB: r.db.DB}
+	clubHandler := &handlers.ClubHandler{DB: r.db.DB}
 
 	// Health check
 	r.engine.GET("/health", func(c *gin.Context) {
@@ -50,40 +52,73 @@ func (r *Router) Setup() *gin.Engine {
 			auth.POST("/login", authHandler.Login)
 		}
 
-		// Public event routes (read-only)
+		// ====================================================================
+		// PUBLIC ROUTES - Departments & Clubs
+		// ====================================================================
+		
+		// Departments
+		v1.GET("/departments", deptHandler.GetDepartments)
+		v1.GET("/departments/:id", deptHandler.GetDepartment)
+		v1.GET("/departments/:id/clubs", deptHandler.GetDepartmentClubs)
+
+		// Clubs
+		v1.GET("/clubs", clubHandler.GetClubs)
+		v1.GET("/clubs/:id", clubHandler.GetClub)
+		v1.GET("/clubs/:id/members", clubHandler.GetClubMembers)
+		v1.GET("/clubs/:id/events", clubHandler.GetClubEvents)
+		v1.GET("/clubs/:id/announcements", clubHandler.GetClubAnnouncements)
+		v1.GET("/clubs/:id/awards", clubHandler.GetClubAwards)
+
+		// Events
 		v1.GET("/events", eventHandler.ListEvents)
 		v1.GET("/events/:id", eventHandler.GetEvent)
 
-		// Protected routes (require authentication)
+		// ====================================================================
+		// PROTECTED ROUTES (Authenticated Users)
+		// ====================================================================
+		
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(r.authService))
 		{
 			// User profile
 			protected.GET("/profile", authHandler.GetProfile)
 
-			// Event registration (students can register for events)
-			// protected.POST("/events/:id/register", eventHandler.RegisterForEvent)
-			// protected.DELETE("/events/:id/register", eventHandler.UnregisterFromEvent)
+			// Club announcements (create/update/delete by club admins)
+			protected.POST("/clubs/:id/announcements", clubHandler.CreateClubAnnouncement)
+			protected.PUT("/clubs/:id/announcements/:announcement_id", clubHandler.UpdateClubAnnouncement)
+			protected.DELETE("/clubs/:id/announcements/:announcement_id", clubHandler.DeleteClubAnnouncement)
+
+			// Club members (add/update/remove by club admins)
+			protected.POST("/clubs/:id/members", clubHandler.AddClubMember)
+			protected.PUT("/clubs/:id/members/:user_id", clubHandler.UpdateClubMember)
+			protected.DELETE("/clubs/:id/members/:user_id", clubHandler.RemoveClubMember)
+
+			// Club awards (add by club admins)
+			protected.POST("/clubs/:id/awards", clubHandler.CreateClubAward)
 		}
 
-		// Admin routes
+		// ====================================================================
+		// ADMIN ROUTES (System Administrators)
+		// ====================================================================
+		
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(r.authService))
 		admin.Use(middleware.AdminMiddleware())
 		{
+			// Department management
+			admin.POST("/departments", deptHandler.CreateDepartment)
+			admin.PUT("/departments/:id", deptHandler.UpdateDepartment)
+			admin.DELETE("/departments/:id", deptHandler.DeleteDepartment)
+
+			// Club management
+			admin.POST("/clubs", clubHandler.CreateClub)
+			admin.PUT("/clubs/:id", clubHandler.UpdateClub)
+			admin.DELETE("/clubs/:id", clubHandler.DeleteClub)
+
 			// Event management
 			admin.POST("/events", eventHandler.CreateEvent)
 			admin.PUT("/events/:id", eventHandler.UpdateEvent)
 			admin.DELETE("/events/:id", eventHandler.DeleteEvent)
-
-			// Club management (to be implemented)
-			// admin.POST("/clubs", clubHandler.CreateClub)
-			// admin.PUT("/clubs/:id", clubHandler.UpdateClub)
-			// admin.DELETE("/clubs/:id", clubHandler.DeleteClub)
-
-			// User management (to be implemented)
-			// admin.GET("/users", userHandler.ListUsers)
-			// admin.PUT("/users/:id/role", userHandler.UpdateUserRole)
 		}
 	}
 
