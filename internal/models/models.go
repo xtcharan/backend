@@ -299,11 +299,11 @@ func (jt *JSONTime) UnmarshalJSON(data []byte) error {
 
 	// Try multiple formats to handle Flutter and standard formats
 	formats := []string{
-		"2006-01-02T15:04:05.000Z",        // Flutter format with milliseconds
-		"2006-01-02T15:04:05Z",             // ISO8601 without milliseconds
-		"2006-01-02T15:04:05.000Z07:00",   // RFC3339 with milliseconds
-		"2006-01-02T15:04:05Z07:00",       // RFC3339
-		"2006-01-02T15:04:05",              // Date and time only
+		"2006-01-02T15:04:05.000Z",      // Flutter format with milliseconds
+		"2006-01-02T15:04:05Z",          // ISO8601 without milliseconds
+		"2006-01-02T15:04:05.000Z07:00", // RFC3339 with milliseconds
+		"2006-01-02T15:04:05Z07:00",     // RFC3339
+		"2006-01-02T15:04:05",           // Date and time only
 	}
 
 	var parsedTime time.Time
@@ -386,4 +386,80 @@ type PaginatedResponse struct {
 	PageSize   int         `json:"page_size"`
 	TotalItems int64       `json:"total_items"`
 	TotalPages int         `json:"total_pages"`
+}
+
+// ============================================================================
+// SCHEDULES
+// ============================================================================
+
+// TimeString is a custom type for time-only values that serializes to "HH:MM" format
+type TimeString time.Time
+
+func (t TimeString) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", time.Time(t).Format("15:04"))), nil
+}
+
+func (t *TimeString) UnmarshalJSON(data []byte) error {
+	str := string(data)
+	str = str[1 : len(str)-1] // remove quotes
+	parsed, err := time.Parse("15:04", str)
+	if err != nil {
+		return err
+	}
+	*t = TimeString(parsed)
+	return nil
+}
+
+func (t *TimeString) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case time.Time:
+		*t = TimeString(v)
+	case string:
+		parsed, err := time.Parse("15:04:05", v)
+		if err != nil {
+			return err
+		}
+		*t = TimeString(parsed)
+	}
+	return nil
+}
+
+// Schedule represents a daily schedule item (official or personal)
+type Schedule struct {
+	ID           uuid.UUID   `json:"id" db:"id"`
+	Title        string      `json:"title" db:"title"`
+	Description  *string     `json:"description,omitempty" db:"description"`
+	ScheduleDate time.Time   `json:"schedule_date" db:"schedule_date"`
+	StartTime    TimeString  `json:"start_time" db:"start_time"`
+	EndTime      *TimeString `json:"end_time,omitempty" db:"end_time"`
+	Location     *string     `json:"location,omitempty" db:"location"`
+	ScheduleType string      `json:"schedule_type" db:"schedule_type"` // 'official' or 'personal'
+	CreatedBy    uuid.UUID   `json:"created_by" db:"created_by"`
+	UserID       *uuid.UUID  `json:"user_id,omitempty" db:"user_id"` // null for official schedules
+	CreatedAt    time.Time   `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at" db:"updated_at"`
+}
+
+// CreateScheduleRequest represents schedule creation data
+type CreateScheduleRequest struct {
+	Title        string  `json:"title" binding:"required,max=255"`
+	Description  *string `json:"description"`
+	ScheduleDate string  `json:"schedule_date" binding:"required"` // YYYY-MM-DD format
+	StartTime    string  `json:"start_time" binding:"required"`    // HH:MM format
+	EndTime      *string `json:"end_time"`
+	Location     *string `json:"location"`
+	ScheduleType string  `json:"schedule_type"` // 'official' or 'personal', defaults to 'personal'
+}
+
+// UpdateScheduleRequest represents schedule update data
+type UpdateScheduleRequest struct {
+	Title        *string `json:"title" binding:"omitempty,max=255"`
+	Description  *string `json:"description"`
+	ScheduleDate *string `json:"schedule_date"` // YYYY-MM-DD format
+	StartTime    *string `json:"start_time"`    // HH:MM format
+	EndTime      *string `json:"end_time"`
+	Location     *string `json:"location"`
 }

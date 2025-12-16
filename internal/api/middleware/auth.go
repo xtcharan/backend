@@ -53,6 +53,42 @@ func AuthMiddleware(authService *auth.Service) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuthMiddleware validates JWT tokens if present, but doesn't require them
+// Use for endpoints that work with or without authentication
+func OptionalAuthMiddleware(authService *auth.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			// No token provided, continue without authentication
+			c.Next()
+			return
+		}
+
+		// Extract token from "Bearer <token>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			// Invalid format, continue without authentication
+			c.Next()
+			return
+		}
+
+		token := parts[1]
+		claims, err := authService.ValidateToken(token)
+		if err != nil {
+			// Invalid token, continue without authentication
+			c.Next()
+			return
+		}
+
+		// Set user info in context
+		c.Set("user_id", claims.UserID)
+		c.Set("user_email", claims.Email)
+		c.Set("user_role", claims.Role)
+
+		c.Next()
+	}
+}
+
 // AdminMiddleware checks if user has admin role
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

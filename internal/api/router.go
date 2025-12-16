@@ -9,10 +9,10 @@ import (
 )
 
 type Router struct {
-	engine       *gin.Engine
-	db           *database.DB
-	authService  *auth.Service
-	corsOrigins  string
+	engine      *gin.Engine
+	db          *database.DB
+	authService *auth.Service
+	corsOrigins string
 }
 
 func NewRouter(db *database.DB, authService *auth.Service, corsOrigins string) *Router {
@@ -33,11 +33,12 @@ func (r *Router) Setup() *gin.Engine {
 	eventHandler := handlers.NewEventHandler(r.db)
 	deptHandler := &handlers.DepartmentHandler{DB: r.db.DB}
 	clubHandler := &handlers.ClubHandler{DB: r.db.DB}
+	scheduleHandler := handlers.NewScheduleHandler(r.db)
 
 	// Health check
 	r.engine.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"status": "ok",
+			"status":  "ok",
 			"service": "college-events-api",
 		})
 	})
@@ -55,7 +56,7 @@ func (r *Router) Setup() *gin.Engine {
 		// ====================================================================
 		// PUBLIC ROUTES - Departments & Clubs
 		// ====================================================================
-		
+
 		// Departments
 		v1.GET("/departments", deptHandler.GetDepartments)
 		v1.GET("/departments/:id", deptHandler.GetDepartment)
@@ -73,10 +74,14 @@ func (r *Router) Setup() *gin.Engine {
 		v1.GET("/events", eventHandler.ListEvents)
 		v1.GET("/events/:id", eventHandler.GetEvent)
 
+		// Schedules (public GET - returns official schedules, personal schedules if authenticated)
+		v1.GET("/schedules", middleware.OptionalAuthMiddleware(r.authService), scheduleHandler.ListSchedules)
+		v1.GET("/schedules/:id", middleware.OptionalAuthMiddleware(r.authService), scheduleHandler.GetSchedule)
+
 		// ====================================================================
 		// PROTECTED ROUTES (Authenticated Users)
 		// ====================================================================
-		
+
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(r.authService))
 		{
@@ -95,12 +100,17 @@ func (r *Router) Setup() *gin.Engine {
 
 			// Club awards (add by club admins)
 			protected.POST("/clubs/:id/awards", clubHandler.CreateClubAward)
+
+			// Schedule management (users can create/edit/delete their own personal schedules)
+			protected.POST("/schedules", scheduleHandler.CreateSchedule)
+			protected.PUT("/schedules/:id", scheduleHandler.UpdateSchedule)
+			protected.DELETE("/schedules/:id", scheduleHandler.DeleteSchedule)
 		}
 
 		// ====================================================================
 		// ADMIN ROUTES (System Administrators)
 		// ====================================================================
-		
+
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(r.authService))
 		admin.Use(middleware.AdminMiddleware())
