@@ -35,6 +35,7 @@ type Config struct {
 	StorageProvider string
 	GCSBucketName   string
 	GCSProjectID    string
+	GCSCdnURL       string // Optional CDN URL for image delivery
 	AWSRegion       string
 	AWSBucketName   string
 	AWSAccessKeyID  string
@@ -73,6 +74,7 @@ func Load() (*Config, error) {
 		StorageProvider:            getEnv("STORAGE_PROVIDER", "local"),
 		GCSBucketName:              getEnv("GCS_BUCKET_NAME", ""),
 		GCSProjectID:               getEnv("GCS_PROJECT_ID", ""),
+		GCSCdnURL:                  getEnv("GCS_CDN_URL", ""),
 		AWSRegion:                  getEnv("AWS_REGION", "us-east-1"),
 		AWSBucketName:              getEnv("AWS_BUCKET_NAME", ""),
 		AWSAccessKeyID:             getEnv("AWS_ACCESS_KEY_ID", ""),

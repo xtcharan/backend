@@ -5,6 +5,7 @@ import (
 	"github.com/yourusername/college-event-backend/internal/api/handlers"
 	"github.com/yourusername/college-event-backend/internal/api/middleware"
 	"github.com/yourusername/college-event-backend/internal/services/auth"
+	"github.com/yourusername/college-event-backend/internal/storage"
 	"github.com/yourusername/college-event-backend/pkg/database"
 )
 
@@ -12,14 +13,16 @@ type Router struct {
 	engine      *gin.Engine
 	db          *database.DB
 	authService *auth.Service
+	storage     storage.StorageService
 	corsOrigins string
 }
 
-func NewRouter(db *database.DB, authService *auth.Service, corsOrigins string) *Router {
+func NewRouter(db *database.DB, authService *auth.Service, storageService storage.StorageService, corsOrigins string) *Router {
 	return &Router{
 		engine:      gin.Default(),
 		db:          db,
 		authService: authService,
+		storage:     storageService,
 		corsOrigins: corsOrigins,
 	}
 }
@@ -34,6 +37,8 @@ func (r *Router) Setup() *gin.Engine {
 	deptHandler := &handlers.DepartmentHandler{DB: r.db.DB}
 	clubHandler := &handlers.ClubHandler{DB: r.db.DB}
 	scheduleHandler := handlers.NewScheduleHandler(r.db)
+	uploadHandler := handlers.NewUploadHandler(r.storage)
+	houseHandler := handlers.NewHouseHandler(r.db.DB)
 
 	// Health check
 	r.engine.GET("/health", func(c *gin.Context) {
@@ -42,6 +47,9 @@ func (r *Router) Setup() *gin.Engine {
 			"service": "college-events-api",
 		})
 	})
+
+	// Serve static files for local storage (development)
+	r.engine.Static("/uploads", "./uploads")
 
 	// API v1 routes
 	v1 := r.engine.Group("/api/v1")
@@ -78,6 +86,13 @@ func (r *Router) Setup() *gin.Engine {
 		v1.GET("/schedules", middleware.OptionalAuthMiddleware(r.authService), scheduleHandler.ListSchedules)
 		v1.GET("/schedules/:id", middleware.OptionalAuthMiddleware(r.authService), scheduleHandler.GetSchedule)
 
+		// Houses (public)
+		v1.GET("/houses", houseHandler.GetHouses)
+		v1.GET("/houses/:id", houseHandler.GetHouse)
+		v1.GET("/houses/:id/announcements", middleware.OptionalAuthMiddleware(r.authService), houseHandler.GetAnnouncements)
+		v1.GET("/houses/:id/events", middleware.OptionalAuthMiddleware(r.authService), houseHandler.GetHouseEvents)
+		v1.GET("/announcements/:id/comments", houseHandler.GetComments)
+
 		// ====================================================================
 		// PROTECTED ROUTES (Authenticated Users)
 		// ====================================================================
@@ -105,6 +120,14 @@ func (r *Router) Setup() *gin.Engine {
 			protected.POST("/schedules", scheduleHandler.CreateSchedule)
 			protected.PUT("/schedules/:id", scheduleHandler.UpdateSchedule)
 			protected.DELETE("/schedules/:id", scheduleHandler.DeleteSchedule)
+
+			// House interactions (authenticated users)
+			protected.POST("/houses/:id/roles", houseHandler.AddHouseRole)
+			protected.DELETE("/houses/:id/roles/:role_id", houseHandler.RemoveHouseRole)
+			protected.POST("/announcements/:id/like", houseHandler.LikeAnnouncement)
+			protected.POST("/announcements/:id/comments", houseHandler.AddComment)
+			protected.POST("/house-events/:event_id/enroll", houseHandler.EnrollInEvent)
+			protected.DELETE("/house-events/:event_id/enroll", houseHandler.UnenrollFromEvent)
 		}
 
 		// ====================================================================
@@ -129,6 +152,16 @@ func (r *Router) Setup() *gin.Engine {
 			admin.POST("/events", eventHandler.CreateEvent)
 			admin.PUT("/events/:id", eventHandler.UpdateEvent)
 			admin.DELETE("/events/:id", eventHandler.DeleteEvent)
+
+			// Image upload (optimized & stored to GCS/local)
+			admin.POST("/upload", uploadHandler.UploadImage)
+
+			// House management
+			admin.POST("/houses", houseHandler.CreateHouse)
+			admin.PUT("/houses/:id", houseHandler.UpdateHouse)
+			admin.DELETE("/houses/:id", houseHandler.DeleteHouse)
+			admin.POST("/houses/:id/announcements", houseHandler.CreateAnnouncement)
+			admin.POST("/houses/:id/events", houseHandler.CreateHouseEvent)
 		}
 	}
 

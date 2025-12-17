@@ -463,3 +463,183 @@ type UpdateScheduleRequest struct {
 	EndTime      *string `json:"end_time"`
 	Location     *string `json:"location"`
 }
+
+// ============================================================================
+// HOUSES
+// ============================================================================
+
+// House represents a house in the school house system
+type House struct {
+	ID          uuid.UUID  `json:"id" db:"id"`
+	Name        string     `json:"name" db:"name"`
+	Color       *string    `json:"color,omitempty" db:"color"`
+	Description *string    `json:"description,omitempty" db:"description"`
+	LogoURL     *string    `json:"logo_url,omitempty" db:"logo_url"`
+	Points      int        `json:"points" db:"points"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty" db:"updated_at"`
+	DeletedAt   *time.Time `json:"-" db:"deleted_at"`
+	// Computed fields (not in DB)
+	Roles []HouseRole `json:"roles,omitempty"`
+}
+
+// CreateHouseRequest represents house creation data
+type CreateHouseRequest struct {
+	Name        string  `json:"name" binding:"required,max=100"`
+	Color       *string `json:"color"`
+	Description *string `json:"description"`
+	LogoURL     *string `json:"logo_url"`
+}
+
+// UpdateHouseRequest represents house update data
+type UpdateHouseRequest struct {
+	Name        *string `json:"name" binding:"omitempty,max=100"`
+	Color       *string `json:"color"`
+	Description *string `json:"description"`
+	LogoURL     *string `json:"logo_url"`
+	Points      *int    `json:"points"`
+}
+
+// ============================================================================
+// HOUSE ROLES
+// ============================================================================
+
+// HouseRole represents a role/position in a house (admin-defined)
+type HouseRole struct {
+	ID           uuid.UUID `json:"id" db:"id"`
+	HouseID      uuid.UUID `json:"house_id" db:"house_id"`
+	MemberName   string    `json:"member_name" db:"member_name"`
+	RoleTitle    string    `json:"role_title" db:"role_title"`
+	DisplayOrder int       `json:"display_order" db:"display_order"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
+// CreateHouseRoleRequest represents house role creation data
+type CreateHouseRoleRequest struct {
+	MemberName   string `json:"member_name" binding:"required,max=255"`
+	RoleTitle    string `json:"role_title" binding:"required,max=255"`
+	DisplayOrder *int   `json:"display_order"`
+}
+
+// ============================================================================
+// HOUSE ANNOUNCEMENTS
+// ============================================================================
+
+// HouseAnnouncement represents an announcement in a house
+type HouseAnnouncement struct {
+	ID        uuid.UUID  `json:"id" db:"id"`
+	HouseID   uuid.UUID  `json:"house_id" db:"house_id"`
+	Title     string     `json:"title" db:"title"`
+	Content   string     `json:"content" db:"content"`
+	CreatedBy *uuid.UUID `json:"created_by,omitempty" db:"created_by"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at" db:"updated_at"`
+	DeletedAt *time.Time `json:"-" db:"deleted_at"`
+	// Computed fields
+	AuthorName   string `json:"author_name,omitempty"`
+	LikeCount    int    `json:"like_count"`
+	CommentCount int    `json:"comment_count"`
+	IsLikedByMe  bool   `json:"is_liked_by_me"`
+}
+
+// CreateHouseAnnouncementRequest represents announcement creation data
+type CreateHouseAnnouncementRequest struct {
+	Title   string `json:"title" binding:"required,max=500"`
+	Content string `json:"content" binding:"required"`
+}
+
+// UpdateHouseAnnouncementRequest represents announcement update data
+type UpdateHouseAnnouncementRequest struct {
+	Title   *string `json:"title" binding:"omitempty,max=500"`
+	Content *string `json:"content"`
+}
+
+// ============================================================================
+// ANNOUNCEMENT LIKES & COMMENTS
+// ============================================================================
+
+// AnnouncementLike represents a like on an announcement
+type AnnouncementLike struct {
+	ID             uuid.UUID `json:"id" db:"id"`
+	AnnouncementID uuid.UUID `json:"announcement_id" db:"announcement_id"`
+	UserID         uuid.UUID `json:"user_id" db:"user_id"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+}
+
+// AnnouncementComment represents a comment on an announcement
+type AnnouncementComment struct {
+	ID             uuid.UUID  `json:"id" db:"id"`
+	AnnouncementID uuid.UUID  `json:"announcement_id" db:"announcement_id"`
+	UserID         uuid.UUID  `json:"user_id" db:"user_id"`
+	Content        string     `json:"content" db:"content"`
+	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
+	DeletedAt      *time.Time `json:"-" db:"deleted_at"`
+	// Computed fields
+	UserName  string `json:"user_name,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+}
+
+// CreateCommentRequest represents comment creation data
+type CreateCommentRequest struct {
+	Content string `json:"content" binding:"required,max=1000"`
+}
+
+// ============================================================================
+// HOUSE EVENTS
+// ============================================================================
+
+// HouseEvent represents an event specific to a house
+type HouseEvent struct {
+	ID                   uuid.UUID  `json:"id" db:"id"`
+	HouseID              uuid.UUID  `json:"house_id" db:"house_id"`
+	Title                string     `json:"title" db:"title"`
+	Description          *string    `json:"description,omitempty" db:"description"`
+	EventDate            time.Time  `json:"event_date" db:"event_date"`
+	StartTime            *string    `json:"start_time,omitempty" db:"start_time"`
+	EndTime              *string    `json:"end_time,omitempty" db:"end_time"`
+	Venue                *string    `json:"venue,omitempty" db:"venue"`
+	MaxParticipants      *int       `json:"max_participants,omitempty" db:"max_participants"`
+	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty" db:"registration_deadline"`
+	Status               string     `json:"status" db:"status"` // open, closed, completed
+	CreatedBy            *uuid.UUID `json:"created_by,omitempty" db:"created_by"`
+	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
+	DeletedAt            *time.Time `json:"-" db:"deleted_at"`
+	// Computed fields
+	EnrollmentCount int  `json:"enrollment_count"`
+	IsEnrolled      bool `json:"is_enrolled"`
+}
+
+// CreateHouseEventRequest represents house event creation data
+type CreateHouseEventRequest struct {
+	Title                string  `json:"title" binding:"required,max=255"`
+	Description          *string `json:"description"`
+	EventDate            string  `json:"event_date" binding:"required"` // YYYY-MM-DD format
+	StartTime            *string `json:"start_time"`                    // HH:MM format
+	EndTime              *string `json:"end_time"`
+	Venue                *string `json:"venue"`
+	MaxParticipants      *int    `json:"max_participants"`
+	RegistrationDeadline *string `json:"registration_deadline"` // YYYY-MM-DD format
+}
+
+// UpdateHouseEventRequest represents house event update data
+type UpdateHouseEventRequest struct {
+	Title                *string `json:"title" binding:"omitempty,max=255"`
+	Description          *string `json:"description"`
+	EventDate            *string `json:"event_date"` // YYYY-MM-DD format
+	StartTime            *string `json:"start_time"`
+	EndTime              *string `json:"end_time"`
+	Venue                *string `json:"venue"`
+	MaxParticipants      *int    `json:"max_participants"`
+	RegistrationDeadline *string `json:"registration_deadline"`
+	Status               *string `json:"status"`
+}
+
+// HouseEventEnrollment represents a user enrollment in a house event
+type HouseEventEnrollment struct {
+	ID         uuid.UUID `json:"id" db:"id"`
+	EventID    uuid.UUID `json:"event_id" db:"event_id"`
+	UserID     uuid.UUID `json:"user_id" db:"user_id"`
+	EnrolledAt time.Time `json:"enrolled_at" db:"enrolled_at"`
+}

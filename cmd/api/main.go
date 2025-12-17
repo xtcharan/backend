@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
+	"cloud.google.com/go/storage"
 	"github.com/yourusername/college-event-backend/internal/api"
 	"github.com/yourusername/college-event-backend/internal/services/auth"
+	localstorage "github.com/yourusername/college-event-backend/internal/storage"
 	"github.com/yourusername/college-event-backend/pkg/config"
 	"github.com/yourusername/college-event-backend/pkg/database"
 )
@@ -31,8 +34,15 @@ func main() {
 	// Initialize auth service
 	authService := auth.NewService(cfg.JWTSecret, cfg.JWTExpiryHours, cfg.RefreshTokenExpiryDays)
 
+	// Initialize storage service based on configuration
+	storageService, err := initStorageService(cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage service: %v", err)
+	}
+	log.Printf("✓ Storage service initialized (provider: %s)", cfg.StorageProvider)
+
 	// Setup router
-	router := api.NewRouter(db, authService, cfg.CORSAllowedOrigins)
+	router := api.NewRouter(db, authService, storageService, cfg.CORSAllowedOrigins)
 	router.Setup()
 
 	log.Println("✓ API routes configured")
@@ -50,6 +60,33 @@ func main() {
 
 	if err := router.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+// initStorageService creates the appropriate storage service based on configuration
+func initStorageService(cfg *config.Config) (localstorage.StorageService, error) {
+	switch cfg.StorageProvider {
+	case "gcs":
+		// Initialize GCS client
+		ctx := context.Background()
+		client, err := storage.NewClient(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GCS client: %w", err)
+		}
+		log.Printf("  → GCS bucket: %s", cfg.GCSBucketName)
+		if cfg.GCSCdnURL != "" {
+			log.Printf("  → CDN URL: %s", cfg.GCSCdnURL)
+		}
+		return localstorage.NewGCSStorage(client, cfg.GCSBucketName, cfg.GCSCdnURL), nil
+
+	case "local":
+		fallthrough
+	default:
+		// Use local storage for development
+		basePath := "./uploads"
+		baseURL := fmt.Sprintf("http://localhost:%s/uploads", cfg.Port)
+		log.Printf("  → Local storage: %s", basePath)
+		return localstorage.NewLocalStorage(basePath, baseURL), nil
 	}
 }
 
