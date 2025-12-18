@@ -266,11 +266,15 @@ type Event struct {
 	CurrentParticipants  int        `json:"current_participants" db:"current_participants"`
 	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty" db:"registration_deadline"`
 	IsFeatured           bool       `json:"is_featured" db:"is_featured"`
-	ClubID               *uuid.UUID `json:"club_id,omitempty" db:"club_id"`
-	CreatedBy            *uuid.UUID `json:"created_by,omitempty" db:"created_by"`
-	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
-	DeletedAt            *time.Time `json:"-" db:"deleted_at"`
+	// Payment fields
+	IsPaidEvent bool       `json:"is_paid_event" db:"is_paid_event"`
+	EventAmount *float64   `json:"event_amount,omitempty" db:"event_amount"`
+	Currency    *string    `json:"currency,omitempty" db:"currency"`
+	ClubID      *uuid.UUID `json:"club_id,omitempty" db:"club_id"`
+	CreatedBy   *uuid.UUID `json:"created_by,omitempty" db:"created_by"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	DeletedAt   *time.Time `json:"-" db:"deleted_at"`
 }
 
 // CreateEventRequest represents event creation data
@@ -285,6 +289,10 @@ type CreateEventRequest struct {
 	Category    *string    `json:"category"`
 	MaxCapacity *int       `json:"max_capacity"`
 	ClubID      *uuid.UUID `json:"club_id"`
+	// Payment fields
+	IsPaidEvent bool     `json:"is_paid_event"`
+	EventAmount *float64 `json:"event_amount"`
+	Currency    *string  `json:"currency"`
 }
 
 // JSONTime is a custom time type that handles multiple datetime formats
@@ -337,6 +345,55 @@ type EventRegistration struct {
 	EventID      uuid.UUID `json:"event_id" db:"event_id"`
 	UserID       uuid.UUID `json:"user_id" db:"user_id"`
 	RegisteredAt time.Time `json:"registered_at" db:"registered_at"`
+}
+
+// ============================================================================
+// PAYMENTS
+// ============================================================================
+
+// EventPayment represents a payment transaction for event registration
+type EventPayment struct {
+	ID                uuid.UUID `json:"id" db:"id"`
+	EventID           uuid.UUID `json:"event_id" db:"event_id"`
+	UserID            uuid.UUID `json:"user_id" db:"user_id"`
+	RazorpayOrderID   string    `json:"razorpay_order_id" db:"razorpay_order_id"`
+	RazorpayPaymentID *string   `json:"razorpay_payment_id,omitempty" db:"razorpay_payment_id"`
+	RazorpaySignature *string   `json:"razorpay_signature,omitempty" db:"razorpay_signature"`
+	Amount            float64   `json:"amount" db:"amount"`
+	Currency          string    `json:"currency" db:"currency"`
+	Status            string    `json:"status" db:"status"` // pending, paid, failed, refunded
+	FailureReason     *string   `json:"failure_reason,omitempty" db:"failure_reason"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// CreateOrderRequest represents request to create a Razorpay order
+type CreateOrderRequest struct {
+	EventID uuid.UUID `json:"event_id" binding:"required"`
+}
+
+// CreateOrderResponse represents response after creating a Razorpay order
+type CreateOrderResponse struct {
+	OrderID  string `json:"order_id"`
+	Amount   int    `json:"amount"` // Amount in paise
+	Currency string `json:"currency"`
+	KeyID    string `json:"key_id"`
+	EventID  string `json:"event_id"`
+}
+
+// VerifyPaymentRequest represents request to verify a payment
+type VerifyPaymentRequest struct {
+	RazorpayOrderID   string `json:"razorpay_order_id" binding:"required"`
+	RazorpayPaymentID string `json:"razorpay_payment_id" binding:"required"`
+	RazorpaySignature string `json:"razorpay_signature" binding:"required"`
+	EventID           string `json:"event_id" binding:"required"`
+}
+
+// PaymentStatusResponse represents payment status for an event
+type PaymentStatusResponse struct {
+	HasPaid   bool    `json:"has_paid"`
+	PaymentID *string `json:"payment_id,omitempty"`
+	Status    *string `json:"status,omitempty"`
 }
 
 // ============================================================================

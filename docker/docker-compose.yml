@@ -51,6 +51,9 @@ services:
       - CORS_ALLOWED_ORIGINS=*
       - INITIAL_ADMIN_EMAIL=admin@college.edu
       - INITIAL_ADMIN_PASSWORD=admin123
+      # Razorpay Test Credentials - Replace with your own from https://dashboard.razorpay.com/
+      - RAZORPAY_KEY_ID=rzp_test_Rt0ghiEqoBPWym
+      - RAZORPAY_KEY_SECRET=4egMPG3aOV0uozV4hwNK3x88
     ports:
       - "8080:8080"
     depends_on:

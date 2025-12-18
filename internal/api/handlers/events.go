@@ -25,6 +25,7 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 	rows, err := h.db.Query(`
 		SELECT id, title, description, banner_url, start_date, end_date, location, category, 
 		       status, max_participants, current_participants, registration_deadline, is_featured,
+		       is_paid_event, event_amount, currency,
 		       club_id, created_by, created_at, updated_at
 		FROM events
 		WHERE deleted_at IS NULL AND end_date >= $1
@@ -47,8 +48,9 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 			&event.ID, &event.Title, &event.Description, &event.BannerURL,
 			&event.StartDate, &event.EndDate, &event.Location, &event.Category,
 			&event.Status, &event.MaxParticipants, &event.CurrentParticipants,
-			&event.RegistrationDeadline, &event.IsFeatured, &event.ClubID,
-			&event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
+			&event.RegistrationDeadline, &event.IsFeatured,
+			&event.IsPaidEvent, &event.EventAmount, &event.Currency,
+			&event.ClubID, &event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
 		)
 		if err != nil {
 			continue
@@ -78,6 +80,7 @@ func (h *EventHandler) GetEvent(c *gin.Context) {
 	err = h.db.QueryRow(`
 		SELECT id, title, description, banner_url, start_date, end_date, location, category,
 		       status, max_participants, current_participants, registration_deadline, is_featured,
+		       is_paid_event, event_amount, currency,
 		       club_id, created_by, created_at, updated_at
 		FROM events
 		WHERE id = $1 AND deleted_at IS NULL
@@ -85,8 +88,9 @@ func (h *EventHandler) GetEvent(c *gin.Context) {
 		&event.ID, &event.Title, &event.Description, &event.BannerURL,
 		&event.StartDate, &event.EndDate, &event.Location, &event.Category,
 		&event.Status, &event.MaxParticipants, &event.CurrentParticipants,
-		&event.RegistrationDeadline, &event.IsFeatured, &event.ClubID,
-		&event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
+		&event.RegistrationDeadline, &event.IsFeatured,
+		&event.IsPaidEvent, &event.EventAmount, &event.Currency,
+		&event.ClubID, &event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -145,19 +149,28 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		bannerURL = req.ImageURL
 	}
 
+	// Default currency to INR if not provided
+	currency := req.Currency
+	if currency == nil {
+		defaultCurrency := "INR"
+		currency = &defaultCurrency
+	}
+
 	var event models.Event
 	err := h.db.QueryRow(`
-		INSERT INTO events (title, description, banner_url, start_date, end_date, location, category, max_participants, club_id, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO events (title, description, banner_url, start_date, end_date, location, category, max_participants, is_paid_event, event_amount, currency, club_id, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id, title, description, banner_url, start_date, end_date, location, category,
 		          status, max_participants, current_participants, registration_deadline, is_featured,
+		          is_paid_event, event_amount, currency,
 		          club_id, created_by, created_at, updated_at
-	`, req.Title, req.Description, bannerURL, startTime, endTime, req.Location, req.Category, req.MaxCapacity, req.ClubID, userID.(uuid.UUID)).Scan(
+	`, req.Title, req.Description, bannerURL, startTime, endTime, req.Location, req.Category, req.MaxCapacity, req.IsPaidEvent, req.EventAmount, currency, req.ClubID, userID.(uuid.UUID)).Scan(
 		&event.ID, &event.Title, &event.Description, &event.BannerURL,
 		&event.StartDate, &event.EndDate, &event.Location, &event.Category,
 		&event.Status, &event.MaxParticipants, &event.CurrentParticipants,
-		&event.RegistrationDeadline, &event.IsFeatured, &event.ClubID,
-		&event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
+		&event.RegistrationDeadline, &event.IsFeatured,
+		&event.IsPaidEvent, &event.EventAmount, &event.Currency,
+		&event.ClubID, &event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
 	)
 
 	if err != nil {
@@ -217,20 +230,32 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		bannerURL = req.ImageURL
 	}
 
+	// Default currency to INR if not provided
+	currency := req.Currency
+	if currency == nil {
+		defaultCurrency := "INR"
+		currency = &defaultCurrency
+	}
+
 	var event models.Event
 	err = h.db.QueryRow(`
 		UPDATE events
-		SET title = $1, description = $2, banner_url = $3, start_date = $4, end_date = $5, location = $6, category = $7, max_participants = $8, club_id = $9, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $10 AND deleted_at IS NULL
+		SET title = $1, description = $2, banner_url = $3, start_date = $4, end_date = $5, 
+		    location = $6, category = $7, max_participants = $8, 
+		    is_paid_event = $9, event_amount = $10, currency = $11,
+		    club_id = $12, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $13 AND deleted_at IS NULL
 		RETURNING id, title, description, banner_url, start_date, end_date, location, category,
 		          status, max_participants, current_participants, registration_deadline, is_featured,
+		          is_paid_event, event_amount, currency,
 		          club_id, created_by, created_at, updated_at
-	`, req.Title, req.Description, bannerURL, startTime, endTime, req.Location, req.Category, req.MaxCapacity, req.ClubID, id).Scan(
+	`, req.Title, req.Description, bannerURL, startTime, endTime, req.Location, req.Category, req.MaxCapacity, req.IsPaidEvent, req.EventAmount, currency, req.ClubID, id).Scan(
 		&event.ID, &event.Title, &event.Description, &event.BannerURL,
 		&event.StartDate, &event.EndDate, &event.Location, &event.Category,
 		&event.Status, &event.MaxParticipants, &event.CurrentParticipants,
-		&event.RegistrationDeadline, &event.IsFeatured, &event.ClubID,
-		&event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
+		&event.RegistrationDeadline, &event.IsFeatured,
+		&event.IsPaidEvent, &event.EventAmount, &event.Currency,
+		&event.ClubID, &event.CreatedBy, &event.CreatedAt, &event.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {

@@ -41,6 +41,7 @@ func (r *Router) Setup() *gin.Engine {
 	houseHandler := handlers.NewHouseHandler(r.db.DB)
 	postsHandler := handlers.NewPostsHandler(r.db.DB)
 	storiesHandler := handlers.NewStoriesHandler(r.db.DB)
+	paymentHandler := handlers.NewPaymentHandler(r.db)
 
 	// Health check
 	r.engine.GET("/health", func(c *gin.Context) {
@@ -114,6 +115,16 @@ func (r *Router) Setup() *gin.Engine {
 			// User profile
 			protected.GET("/profile", authHandler.GetProfile)
 			protected.PUT("/profile", authHandler.UpdateProfile)
+
+			// ================================================================
+			// PAYMENT ROUTES - Razorpay Integration
+			// ================================================================
+			payments := protected.Group("/payments")
+			{
+				payments.POST("/create-order", paymentHandler.CreateOrder)
+				payments.POST("/verify", paymentHandler.VerifyPayment)
+				payments.GET("/status/:event_id", paymentHandler.GetPaymentStatus)
+			}
 
 			// Club announcements (create/update/delete by club admins)
 			protected.POST("/clubs/:id/announcements", clubHandler.CreateClubAnnouncement)
