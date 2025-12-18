@@ -39,6 +39,8 @@ func (r *Router) Setup() *gin.Engine {
 	scheduleHandler := handlers.NewScheduleHandler(r.db)
 	uploadHandler := handlers.NewUploadHandler(r.storage)
 	houseHandler := handlers.NewHouseHandler(r.db.DB)
+	postsHandler := handlers.NewPostsHandler(r.db.DB)
+	storiesHandler := handlers.NewStoriesHandler(r.db.DB)
 
 	// Health check
 	r.engine.GET("/health", func(c *gin.Context) {
@@ -93,6 +95,14 @@ func (r *Router) Setup() *gin.Engine {
 		v1.GET("/houses/:id/events", middleware.OptionalAuthMiddleware(r.authService), houseHandler.GetHouseEvents)
 		v1.GET("/announcements/:id/comments", houseHandler.GetComments)
 
+		// Posts (public read, authenticated for interactions)
+		v1.GET("/posts", middleware.OptionalAuthMiddleware(r.authService), postsHandler.ListPosts)
+		v1.GET("/posts/:id", middleware.OptionalAuthMiddleware(r.authService), postsHandler.GetPost)
+		v1.POST("/posts/:id/view", postsHandler.TrackView) // Can be anonymous
+
+		// Stories (public read, authenticated for interactions)
+		v1.GET("/stories", middleware.OptionalAuthMiddleware(r.authService), storiesHandler.ListStories)
+
 		// ====================================================================
 		// PROTECTED ROUTES (Authenticated Users)
 		// ====================================================================
@@ -128,6 +138,16 @@ func (r *Router) Setup() *gin.Engine {
 			protected.POST("/announcements/:id/comments", houseHandler.AddComment)
 			protected.POST("/house-events/:event_id/enroll", houseHandler.EnrollInEvent)
 			protected.DELETE("/house-events/:event_id/enroll", houseHandler.UnenrollFromEvent)
+
+			// Post interactions (authenticated users)
+			protected.POST("/posts/:id/like", postsHandler.ToggleLike)
+			protected.POST("/posts/:id/comment", postsHandler.AddComment)
+			protected.DELETE("/posts/:id/comments/:comment_id", postsHandler.DeleteComment)
+			protected.POST("/posts/:id/share", postsHandler.TrackShare)
+
+			// Story interactions (authenticated users)
+			protected.POST("/stories/:id/like", storiesHandler.ToggleLike)
+			protected.POST("/stories/:id/view", storiesHandler.TrackView)
 		}
 
 		// ====================================================================
@@ -162,6 +182,16 @@ func (r *Router) Setup() *gin.Engine {
 			admin.DELETE("/houses/:id", houseHandler.DeleteHouse)
 			admin.POST("/houses/:id/announcements", houseHandler.CreateAnnouncement)
 			admin.POST("/houses/:id/events", houseHandler.CreateHouseEvent)
+
+			// Posts management (admin/faculty only)
+			admin.POST("/posts", postsHandler.CreatePost)
+			admin.PUT("/posts/:id", postsHandler.UpdatePost)
+			admin.DELETE("/posts/:id", postsHandler.DeletePost)          // Soft delete
+			admin.DELETE("/posts/:id/hard", postsHandler.HardDeletePost) // Permanent delete
+
+			// Stories management (admin/faculty only)
+			admin.POST("/stories", storiesHandler.CreateStory)
+			admin.DELETE("/stories/:id/hard", storiesHandler.HardDeleteStory) // Permanent delete
 		}
 	}
 

@@ -117,3 +117,37 @@ func (s *GCSStorage) Delete(ctx context.Context, path string) error {
 	}
 	return nil
 }
+
+// MoveToArchive moves an object to Archive storage class
+// This reduces storage costs by 94% ($0.020 -> $0.0012 per GB/month)
+// Archive class has sub-second first-byte latency - users won't notice!
+func (s *GCSStorage) MoveToArchive(ctx context.Context, path string) error {
+	obj := s.client.Bucket(s.bucketName).Object(path)
+
+	// Get current attributes to check if already archived
+	attrs, err := obj.Attrs(ctx)
+	if err != nil {
+		if err == storage.ErrObjectNotExist {
+			// Object doesn't exist, not an error
+			return nil
+		}
+		return fmt.Errorf("failed to get object attributes: %w", err)
+	}
+
+	// Already in ARCHIVE class, skip
+	if attrs.StorageClass == "ARCHIVE" {
+		return nil
+	}
+
+	// Copy object to same location with ARCHIVE storage class
+	// This is the correct way to change storage class in GCS
+	copier := obj.CopierFrom(obj)
+	copier.StorageClass = "ARCHIVE"
+
+	_, err = copier.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to move object %s to Archive storage: %w", path, err)
+	}
+
+	return nil
+}
