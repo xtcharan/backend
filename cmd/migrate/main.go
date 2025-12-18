@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/yourusername/college-event-backend/pkg/config"
@@ -26,24 +28,44 @@ func main() {
 
 	log.Println("✓ Connected to database")
 
-	// Read migration script
-	migrationPath := "migrations/001_initial_schema.sql"
-	migration, err := os.ReadFile(migrationPath)
+	// Read all migration files
+	migrationDir := "migrations"
+	files, err := os.ReadDir(migrationDir)
 	if err != nil {
-		log.Fatalf("Failed to read migration file: %v", err)
+		log.Fatalf("Failed to read migrations directory: %v", err)
 	}
 
-	// Execute migration (ignore errors if schema already exists)
-	_, err = db.Exec(string(migration))
-	if err != nil {
-		// Check if it's just a "already exists" error
-		if strings.Contains(err.Error(), "already exists") {
-			log.Println("✓ Database schema already exists, skipping migration")
-		} else {
-			log.Printf("Warning: Migration error: %v", err)
+	// Sort files to ensure order (001, 002, etc.)
+	var migrationFiles []string
+	for _, f := range files {
+		if !f.IsDir() && strings.HasSuffix(f.Name(), ".sql") {
+			migrationFiles = append(migrationFiles, f.Name())
 		}
-	} else {
-		log.Println("✓ Database migration completed successfully")
 	}
+	sort.Strings(migrationFiles)
+
+	// Execute each migration
+	for _, fileName := range migrationFiles {
+		migrationPath := filepath.Join(migrationDir, fileName)
+		migration, err := os.ReadFile(migrationPath)
+		if err != nil {
+			log.Fatalf("Failed to read migration file %s: %v", fileName, err)
+		}
+
+		// Execute migration (ignore errors if schema already exists)
+		_, err = db.Exec(string(migration))
+		if err != nil {
+			// Check if it's just a "already exists" error
+			if strings.Contains(err.Error(), "already exists") ||
+				strings.Contains(err.Error(), "duplicate key") {
+				log.Printf("✓ %s: Schema already exists, skipping", fileName)
+			} else {
+				log.Printf("Warning: %s: Migration error: %v", fileName, err)
+			}
+		} else {
+			log.Printf("✓ %s: Migration completed successfully", fileName)
+		}
+	}
+
 	fmt.Println("\nDatabase is ready for use!")
 }

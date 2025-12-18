@@ -61,6 +61,7 @@ func (r *Router) Setup() *gin.Engine {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/google", authHandler.GoogleAuth)
 		}
 
 		// ====================================================================
@@ -112,6 +113,7 @@ func (r *Router) Setup() *gin.Engine {
 		{
 			// User profile
 			protected.GET("/profile", authHandler.GetProfile)
+			protected.PUT("/profile", authHandler.UpdateProfile)
 
 			// Club announcements (create/update/delete by club admins)
 			protected.POST("/clubs/:id/announcements", clubHandler.CreateClubAnnouncement)

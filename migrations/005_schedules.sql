@@ -1,4 +1,4 @@
--- Schedules table for daily timetable items
+-- Migration 005: Schedules table for daily timetable items
 -- Supports both official (admin-created) and personal (student-created) schedules
 
 CREATE TABLE IF NOT EXISTS schedules (
@@ -17,11 +17,12 @@ CREATE TABLE IF NOT EXISTS schedules (
 );
 
 -- Indexes for efficient querying
-CREATE INDEX idx_schedules_date ON schedules(schedule_date);
-CREATE INDEX idx_schedules_user ON schedules(user_id);
-CREATE INDEX idx_schedules_type ON schedules(schedule_type);
-CREATE INDEX idx_schedules_date_type ON schedules(schedule_date, schedule_type);
+CREATE INDEX IF NOT EXISTS idx_schedules_date ON schedules(schedule_date);
+CREATE INDEX IF NOT EXISTS idx_schedules_user ON schedules(user_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_type ON schedules(schedule_type);
+CREATE INDEX IF NOT EXISTS idx_schedules_date_type ON schedules(schedule_date, schedule_type);
 
 -- Trigger to auto-update updated_at
+DROP TRIGGER IF EXISTS update_schedules_updated_at ON schedules;
 CREATE TRIGGER update_schedules_updated_at BEFORE UPDATE ON schedules
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
